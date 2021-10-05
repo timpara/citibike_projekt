@@ -1,2 +1,4 @@
 # Project exclude paths
 /citibike_venv/
+*.zip
+*.csv
