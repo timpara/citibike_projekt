@@ -2,3 +2,4 @@
 /citibike_venv/
 *.zip
 *.csv
+*.parquet
