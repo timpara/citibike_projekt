@@ -1,19 +1,16 @@
 # -*- coding: utf-8 -*-
-import click
 import logging
 from pathlib import Path
 from dotenv import find_dotenv, load_dotenv
-
 # Web scraping libraries
 import requests
-import urllib.request
 from bs4 import BeautifulSoup
-import webbrowser
 from time import sleep
-import shutil
+import glob
 import os
 from zipfile import ZipFile
 import wget
+import pandas as pd
 def get_urls_soup_for_citibike(url: str = 'https://s3.amazonaws.com/tripdata/'):
     '''
     Parse XML website as soup for further processing.
@@ -61,18 +58,35 @@ def unzip_files_and_delete_zip(output_filepath: str="data/raw/",
             zip_ref.close()
             if delete_zip_file_after_unzip:
                 os.remove(file_name)
+def combine_csv_files_into_one_and_delete(output_filepath: str="data/raw/",
+                                          file_post_fix: str='*******citibike-tripdata.csv',
+                                          output_filename: str="trip_data.parquet"):
+    '''
+    Reads-in all csv file in output_filepath.
+    Concats their content into one objects and store to local filesystem as parquet.
+    Removes the single files to freeup space.
+    '''
+    csv_files = sorted(glob.glob(os.path.join(os.path.join(output_filepath,file_post_fix))))
+    trip_data = pd.concat((pd.read_csv(file) for file in csv_files), ignore_index=True)
+    #trip_data.to_csv(os.path.join(output_filepath,output_filename), index=False)
+    trip_data.to_parquet(os.path.join(output_filepath,output_filename), index=False)
+    for items in csv_files:
+        os.remove(items)
 
-def main(output_filepath: str="data/raw/"):
+def main(output_filepath: str=os.path.join("data","raw")):
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
     logger = logging.getLogger(__name__)
-    logger.info(f"Writing raw data to {output_filepath}")
-    logger.info('making final data set from raw data')
+
+    logger.info('Parsing Soup of raw data urls.')
     soup = get_urls_soup_for_citibike()
     zip_files = filter_citibike_urls_with_zip_data(soup)
+    logger.info(f"Writing raw data to {output_filepath}")
     download_files_from_url_list(zip_files,output_filepath=output_filepath)
+    logger.info(f"Unzipping raw data in {output_filepath}.")
     unzip_files_and_delete_zip()
+    combine_csv_files_into_one_and_delete()
 
 if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
